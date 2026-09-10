@@ -9,7 +9,8 @@ import {
   XCircle,
   FileCheck,
   Zap,
-  Info
+  Info,
+  MonitorPlay
 } from 'lucide-react';
 import type {
   ClipItem,
@@ -33,6 +34,10 @@ interface ExportPanelProps {
   includeManifest: boolean;
   onToggleManifest: (inc: boolean) => void;
   sourceMetadata: VideoMetadata | null;
+  globalPlayerOverlayEnabled?: boolean;
+  onToggleGlobalPlayerOverlay?: (enabled: boolean) => void;
+  globalPlayerOverlayDuration?: number;
+  onChangeGlobalPlayerOverlayDuration?: (sec: number) => void;
 }
 
 export const ExportPanel: React.FC<ExportPanelProps> = ({
@@ -47,7 +52,11 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
   onDownloadZip,
   includeManifest,
   onToggleManifest,
-  sourceMetadata
+  sourceMetadata,
+  globalPlayerOverlayEnabled = true,
+  onToggleGlobalPlayerOverlay,
+  globalPlayerOverlayDuration = 1.5,
+  onChangeGlobalPlayerOverlayDuration
 }) => {
   // Selected clips in chronological order
   const selectedClips = clips.filter((c) => selectedClipIds.has(c.id));
@@ -151,6 +160,51 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
               style={{ accentColor: 'var(--primary)' }}
             />
           </div>
+        </div>
+
+        {/* Anti-Copyright & Video Player HUD Overlay Card */}
+        <div style={{ background: 'rgba(15, 23, 42, 0.45)', border: '1px solid rgba(99, 102, 241, 0.25)', borderRadius: 'var(--radius-md)', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <MonitorPlay size={16} color="var(--accent-cyan)" />
+              <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#f8fafc' }}>
+                Video Player HUD Overlay (1-2s)
+              </span>
+            </div>
+            <input
+              type="checkbox"
+              checked={globalPlayerOverlayEnabled}
+              onChange={(e) => onToggleGlobalPlayerOverlay?.(e.target.checked)}
+              style={{ accentColor: 'var(--accent-cyan)', width: '16px', height: '16px' }}
+            />
+          </div>
+
+          <p style={{ fontSize: '0.73rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
+            Bypasses social media copyright fingerprinting and stops scrollers by rendering a player HUD (play button, scrubber bar, timecode) during the first 1-2s of each video.
+          </p>
+
+          {globalPlayerOverlayEnabled && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              <span style={{ fontSize: '0.73rem', color: 'var(--text-muted)' }}>Intro Duration:</span>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                {([1.0, 1.5, 2.0] as const).map((sec) => (
+                  <button
+                    key={sec}
+                    className={`toolbar-btn ${globalPlayerOverlayDuration === sec ? 'active' : ''}`}
+                    onClick={() => onChangeGlobalPlayerOverlayDuration?.(sec)}
+                    style={{
+                      padding: '3px 8px',
+                      fontSize: '0.72rem',
+                      background: globalPlayerOverlayDuration === sec ? 'var(--primary)' : 'rgba(0,0,0,0.3)',
+                      color: globalPlayerOverlayDuration === sec ? '#fff' : 'var(--text-secondary)'
+                    }}
+                  >
+                    {sec.toFixed(1)}s
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Live Export Progress Card (when exporting) */}

@@ -17,12 +17,15 @@ import { generateThumbnail } from './utils/thumbnail';
 import { processClip } from './utils/videoProcessor';
 import { packageClipsToZip, triggerFileDownload } from './utils/zipPackager';
 import { saveProjectState, loadProjectState } from './utils/storage';
+import { DEFAULT_PLAYER_OVERLAY } from './utils/playerOverlay';
 
 export const App: React.FC = () => {
   const [projectName, setProjectName] = useState<string>('My Video Project');
   const [sourceMetadata, setSourceMetadata] = useState<VideoMetadata | null>(null);
   const [splitStrategy, setSplitStrategy] = useState<SplitStrategyType>('90s');
   const [customDuration, setCustomDuration] = useState<number>(60);
+  const [globalPlayerOverlayEnabled, setGlobalPlayerOverlayEnabled] = useState<boolean>(true);
+  const [globalPlayerOverlayDuration, setGlobalPlayerOverlayDuration] = useState<number>(1.5);
   const [manualTimestampsText, setManualTimestampsText] = useState<string>(
     '00:00.000 - 01:23.500\n01:23.500 - 02:40.000'
   );
@@ -187,7 +190,12 @@ export const App: React.FC = () => {
         crop: null,
         rotation: 0 as const,
         mute: false,
-        textOverlay: null
+        textOverlay: null,
+        playerOverlay: {
+          ...DEFAULT_PLAYER_OVERLAY,
+          enabled: globalPlayerOverlayEnabled,
+          durationSec: globalPlayerOverlayDuration
+        }
       };
 
       const clipItem: ClipItem = {
@@ -339,6 +347,76 @@ export const App: React.FC = () => {
         return {
           ...clip,
           edits: newEdits,
+          status: 'waiting',
+          processedBlob: undefined
+        };
+      })
+    );
+  };
+
+  // Batch toggle player overlay on selected clips
+  const handleBatchPlayerOverlayToggle = () => {
+    const selected = clips.filter((c) => selectedClipIds.has(c.id));
+    const allEnabled = selected.every((c) => c.edits.playerOverlay?.enabled !== false);
+    const targetState = !allEnabled;
+
+    setClips((prev) =>
+      prev.map((clip) => {
+        if (!selectedClipIds.has(clip.id)) return clip;
+        const currentOverlay = clip.edits.playerOverlay || DEFAULT_PLAYER_OVERLAY;
+        return {
+          ...clip,
+          edits: {
+            ...clip.edits,
+            playerOverlay: {
+              ...currentOverlay,
+              enabled: targetState
+            }
+          },
+          status: 'waiting',
+          processedBlob: undefined
+        };
+      })
+    );
+  };
+
+  // Global toggle for all clips from ExportPanel
+  const handleToggleGlobalPlayerOverlay = (enabled: boolean) => {
+    setGlobalPlayerOverlayEnabled(enabled);
+    setClips((prev) =>
+      prev.map((clip) => {
+        const currentOverlay = clip.edits.playerOverlay || DEFAULT_PLAYER_OVERLAY;
+        return {
+          ...clip,
+          edits: {
+            ...clip.edits,
+            playerOverlay: {
+              ...currentOverlay,
+              enabled
+            }
+          },
+          status: 'waiting',
+          processedBlob: undefined
+        };
+      })
+    );
+  };
+
+  // Global duration adjustment from ExportPanel
+  const handleChangeGlobalPlayerOverlayDuration = (durationSec: number) => {
+    setGlobalPlayerOverlayDuration(durationSec);
+    setClips((prev) =>
+      prev.map((clip) => {
+        const currentOverlay = clip.edits.playerOverlay || DEFAULT_PLAYER_OVERLAY;
+        return {
+          ...clip,
+          edits: {
+            ...clip.edits,
+            playerOverlay: {
+              ...currentOverlay,
+              durationSec
+            }
+          },
           status: 'waiting',
           processedBlob: undefined
         };
@@ -677,6 +755,7 @@ export const App: React.FC = () => {
           onBatchRotate={handleBatchRotate}
           onBatchCropRatio={handleBatchCropRatio}
           onBatchTextOverlay={handleBatchTextOverlay}
+          onBatchPlayerOverlayToggle={handleBatchPlayerOverlayToggle}
           onReorderClip={handleReorderClip}
           onRetryClip={handleRetryClip}
           sourceMetadata={sourceMetadata}
@@ -696,6 +775,10 @@ export const App: React.FC = () => {
           includeManifest={includeManifest}
           onToggleManifest={setIncludeManifest}
           sourceMetadata={sourceMetadata}
+          globalPlayerOverlayEnabled={globalPlayerOverlayEnabled}
+          onToggleGlobalPlayerOverlay={handleToggleGlobalPlayerOverlay}
+          globalPlayerOverlayDuration={globalPlayerOverlayDuration}
+          onChangeGlobalPlayerOverlayDuration={handleChangeGlobalPlayerOverlayDuration}
         />
       </main>
 

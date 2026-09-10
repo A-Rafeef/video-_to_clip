@@ -29,6 +29,15 @@ export interface TextOverlaySettings {
   showBg: boolean;
 }
 
+export interface PlayerOverlaySettings {
+  enabled: boolean;
+  durationSec: number; // 1.0, 1.5, 2.0
+  style?: 'modern' | 'classic' | 'minimal';
+  showPlayButton?: boolean;
+  showProgressBar?: boolean;
+  showTimestamp?: boolean;
+}
+
 export interface ClipEditState {
   startTime: number;
   endTime: number;
@@ -36,6 +45,7 @@ export interface ClipEditState {
   rotation: 0 | 90 | 180 | 270;
   mute: boolean;
   textOverlay: TextOverlaySettings | null;
+  playerOverlay?: PlayerOverlaySettings | null;
 }
 
 export type ClipStatus = 'waiting' | 'processing' | 'completed' | 'failed';

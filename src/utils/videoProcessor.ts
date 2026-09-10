@@ -1,4 +1,5 @@
 import type { ClipItem, CompressionProfile, CompressionProfileConfig } from '../types/video';
+import { drawPlayerOverlay } from './playerOverlay';
 
 export const COMPRESSION_PROFILES: Record<CompressionProfile, CompressionProfileConfig> = {
   original: {
@@ -304,6 +305,20 @@ export async function processClip({
 
             ctx.fillStyle = overlay.color || '#FFFFFF';
             ctx.fillText(text, posX, posY);
+          }
+
+          // Apply Video Player Overlay (first 1-2 seconds) if enabled
+          if (edits.playerOverlay && edits.playerOverlay.enabled) {
+            const elapsed = Math.max(0, currentSec - startTime);
+            drawPlayerOverlay(
+              ctx,
+              canvas.width,
+              canvas.height,
+              elapsed,
+              duration,
+              edits.playerOverlay,
+              `PART ${clip.originalIndex + 1}`
+            );
           }
 
           animFrameId = requestAnimationFrame(drawFrame);

@@ -17,10 +17,12 @@ import {
   Check,
   Clock,
   Sparkles,
-  Layers
+  Layers,
+  MonitorPlay
 } from 'lucide-react';
-import type { ClipItem, ClipEditState, VideoMetadata } from '../types/video';
+import type { ClipItem, ClipEditState, VideoMetadata, PlayerOverlaySettings } from '../types/video';
 import { formatTimestamp, formatDurationHuman, MAX_CLIP_DURATION_SECONDS } from '../utils/time';
+import { drawPlayerOverlay, DEFAULT_PLAYER_OVERLAY } from '../utils/playerOverlay';
 
 interface VideoEditorModalProps {
   clip: ClipItem;
@@ -47,7 +49,7 @@ export const VideoEditorModal: React.FC<VideoEditorModalProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(clip.edits.startTime);
-  const [activeTab, setActiveTab] = useState<'trim' | 'crop' | 'rotate' | 'text'>('trim');
+  const [activeTab, setActiveTab] = useState<'trim' | 'crop' | 'rotate' | 'text' | 'player'>('trim');
 
   // Push new state to undo/redo history
   const recordEdit = useCallback((newEdits: ClipEditState) => {
@@ -182,6 +184,21 @@ export const VideoEditorModal: React.FC<VideoEditorModalProps> = ({
 
           ctx.fillStyle = t.color || '#FFFFFF';
           ctx.fillText(text, targetW / 2, posY);
+        }
+
+        // Video Player HUD Overlay (first 1-2s)
+        if (edits.playerOverlay && edits.playerOverlay.enabled) {
+          const clipElapsed = Math.max(0, video.currentTime - edits.startTime);
+          const currentDur = edits.endTime - edits.startTime;
+          drawPlayerOverlay(
+            ctx,
+            targetW,
+            targetH,
+            clipElapsed,
+            currentDur,
+            edits.playerOverlay,
+            `PART ${clip.originalIndex + 1}`
+          );
         }
       }
       animId = requestAnimationFrame(render);
@@ -539,8 +556,8 @@ export const VideoEditorModal: React.FC<VideoEditorModalProps> = ({
             {/* Right Sidebar: Tools & Tabs */}
             <div className="editor-sidebar-tabs">
               {/* Tab Navigation */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px', background: 'rgba(0,0,0,0.3)', padding: '4px', borderRadius: 'var(--radius-sm)' }}>
-                {(['trim', 'crop', 'rotate', 'text'] as const).map((tab) => (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '4px', background: 'rgba(0,0,0,0.3)', padding: '4px', borderRadius: 'var(--radius-sm)' }}>
+                {(['trim', 'crop', 'rotate', 'text', 'player'] as const).map((tab) => (
                   <button
                     key={tab}
                     className={`toolbar-btn ${activeTab === tab ? 'active' : ''}`}
@@ -549,10 +566,12 @@ export const VideoEditorModal: React.FC<VideoEditorModalProps> = ({
                       justifyContent: 'center',
                       background: activeTab === tab ? 'var(--primary)' : 'transparent',
                       color: activeTab === tab ? '#fff' : 'var(--text-secondary)',
-                      textTransform: 'capitalize'
+                      textTransform: 'capitalize',
+                      fontSize: '0.72rem',
+                      padding: '8px 2px'
                     }}
                   >
-                    {tab}
+                    {tab === 'player' ? 'Player HUD' : tab}
                   </button>
                 ))}
               </div>
@@ -665,6 +684,155 @@ export const VideoEditorModal: React.FC<VideoEditorModalProps> = ({
                           style={{ accentColor: 'var(--primary)' }}
                         />
                       </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Tab: Player HUD Overlay */}
+              {activeTab === 'player' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <MonitorPlay size={16} color="var(--accent-cyan)" />
+                    <span style={{ fontSize: '0.82rem', color: '#f8fafc', fontWeight: 600 }}>
+                      Video Player HUD Overlay (1-2s)
+                    </span>
+                  </div>
+
+                  <div style={{ padding: '8px 10px', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.25)', borderRadius: 'var(--radius-sm)', fontSize: '0.74rem', color: '#cbd5e1', lineHeight: 1.4 }}>
+                    ✨ <strong>Anti-Copyright & Attention Hook:</strong> Simulates a modern video player overlay (play icon, progress scrubber, timecode) during the opening seconds of the clip.
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', background: 'rgba(0,0,0,0.3)', borderRadius: 'var(--radius-sm)' }}>
+                    <span style={{ fontSize: '0.8rem', color: '#fff', fontWeight: 500 }}>Enable Player Overlay:</span>
+                    <input
+                      type="checkbox"
+                      checked={edits.playerOverlay?.enabled ?? true}
+                      onChange={(e) => {
+                        const current = edits.playerOverlay || DEFAULT_PLAYER_OVERLAY;
+                        recordEdit({
+                          ...edits,
+                          playerOverlay: {
+                            ...current,
+                            enabled: e.target.checked
+                          }
+                        });
+                      }}
+                      style={{ accentColor: 'var(--primary)', width: '16px', height: '16px' }}
+                    />
+                  </div>
+
+                  {(edits.playerOverlay?.enabled ?? true) && (
+                    <>
+                      {/* Duration Selector */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                          Overlay Duration:
+                        </span>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
+                          {([1.0, 1.5, 2.0] as const).map((dur) => {
+                            const isCur = (edits.playerOverlay?.durationSec ?? 1.5) === dur;
+                            return (
+                              <button
+                                key={dur}
+                                className={`toolbar-btn ${isCur ? 'active' : ''}`}
+                                onClick={() => {
+                                  const current = edits.playerOverlay || DEFAULT_PLAYER_OVERLAY;
+                                  recordEdit({
+                                    ...edits,
+                                    playerOverlay: { ...current, durationSec: dur }
+                                  });
+                                }}
+                                style={{
+                                  justifyContent: 'center',
+                                  padding: '8px 4px',
+                                  fontSize: '0.78rem',
+                                  background: isCur ? 'var(--primary)' : 'rgba(0,0,0,0.3)'
+                                }}
+                              >
+                                {dur.toFixed(1)}s
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Display Components Toggles */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: 'rgba(0,0,0,0.2)', padding: '8px 10px', borderRadius: 'var(--radius-sm)' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                          <span>Center Play Button:</span>
+                          <input
+                            type="checkbox"
+                            checked={edits.playerOverlay?.showPlayButton ?? true}
+                            onChange={(e) => {
+                              const current = edits.playerOverlay || DEFAULT_PLAYER_OVERLAY;
+                              recordEdit({
+                                ...edits,
+                                playerOverlay: { ...current, showPlayButton: e.target.checked }
+                              });
+                            }}
+                            style={{ accentColor: 'var(--primary)' }}
+                          />
+                        </label>
+
+                        <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                          <span>Scrubber / Progress Bar:</span>
+                          <input
+                            type="checkbox"
+                            checked={edits.playerOverlay?.showProgressBar ?? true}
+                            onChange={(e) => {
+                              const current = edits.playerOverlay || DEFAULT_PLAYER_OVERLAY;
+                              recordEdit({
+                                ...edits,
+                                playerOverlay: { ...current, showProgressBar: e.target.checked }
+                              });
+                            }}
+                            style={{ accentColor: 'var(--primary)' }}
+                          />
+                        </label>
+
+                        <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                          <span>Timecode & HD Badge:</span>
+                          <input
+                            type="checkbox"
+                            checked={edits.playerOverlay?.showTimestamp ?? true}
+                            onChange={(e) => {
+                              const current = edits.playerOverlay || DEFAULT_PLAYER_OVERLAY;
+                              recordEdit({
+                                ...edits,
+                                playerOverlay: { ...current, showTimestamp: e.target.checked }
+                              });
+                            }}
+                            style={{ accentColor: 'var(--primary)' }}
+                          />
+                        </label>
+                      </div>
+
+                      {/* Quick Preview at 0.5s */}
+                      <button
+                        className="toolbar-btn"
+                        onClick={() => {
+                          const vid = videoRef.current;
+                          if (vid) {
+                            vid.pause();
+                            setIsPlaying(false);
+                            const seekTarget = edits.startTime + 0.5;
+                            vid.currentTime = seekTarget;
+                            setCurrentTime(seekTarget);
+                          }
+                        }}
+                        style={{
+                          justifyContent: 'center',
+                          padding: '10px',
+                          background: 'rgba(99, 102, 241, 0.15)',
+                          borderColor: 'var(--primary)',
+                          color: '#fff',
+                          fontSize: '0.8rem'
+                        }}
+                      >
+                        <Play size={14} color="var(--accent-cyan)" />
+                        <span>Jump Playhead to 0.5s (Preview Overlay)</span>
+                      </button>
                     </>
                   )}
                 </div>

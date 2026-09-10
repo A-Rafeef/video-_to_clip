@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import { X, Play, Pause, Film } from 'lucide-react';
 import type { ClipItem, VideoMetadata } from '../types/video';
 import { formatTimestamp, formatDurationHuman } from '../utils/time';
+import { drawPlayerOverlay } from '../utils/playerOverlay';
 
 interface QuickPreviewModalProps {
   clip: ClipItem | null;
@@ -126,6 +127,20 @@ export const QuickPreviewModal: React.FC<QuickPreviewModalProps> = ({
 
           ctx.fillStyle = t.color || '#FFFFFF';
           ctx.fillText(text, targetW / 2, posY);
+        }
+
+        // Video Player HUD Overlay (first 1-2s)
+        if (clip.edits.playerOverlay && clip.edits.playerOverlay.enabled) {
+          const clipElapsed = Math.max(0, video.currentTime - clip.startTime);
+          drawPlayerOverlay(
+            ctx,
+            targetW,
+            targetH,
+            clipElapsed,
+            clip.duration,
+            clip.edits.playerOverlay,
+            `PART ${clip.originalIndex + 1}`
+          );
         }
       }
       animId = requestAnimationFrame(render);

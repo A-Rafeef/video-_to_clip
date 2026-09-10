@@ -14,7 +14,8 @@ import {
   RotateCcw,
   ArrowUp,
   ArrowDown,
-  Info
+  Info,
+  MonitorPlay
 } from 'lucide-react';
 import type { ClipItem, VideoMetadata } from '../types/video';
 import { formatTimestamp, formatDurationHuman, formatFileSize } from '../utils/time';
@@ -34,6 +35,7 @@ interface ClipWorkspacePanelProps {
   onBatchRotate: () => void;
   onBatchCropRatio: (ratio: '16:9' | '9:16' | '1:1') => void;
   onBatchTextOverlay: (text: string) => void;
+  onBatchPlayerOverlayToggle?: () => void;
   onReorderClip: (fromIndex: number, toIndex: number) => void;
   onRetryClip: (clip: ClipItem) => void;
   sourceMetadata: VideoMetadata | null;
@@ -53,6 +55,7 @@ export const ClipWorkspacePanel: React.FC<ClipWorkspacePanelProps> = ({
   onBatchRotate,
   onBatchCropRatio,
   onBatchTextOverlay,
+  onBatchPlayerOverlayToggle,
   onReorderClip,
   onRetryClip,
   sourceMetadata
@@ -63,6 +66,10 @@ export const ClipWorkspacePanel: React.FC<ClipWorkspacePanelProps> = ({
 
   const allSelected = clips.length > 0 && selectedClipIds.size === clips.length;
   const someSelected = selectedClipIds.size > 0;
+  const selectedClips = clips.filter((c) => selectedClipIds.has(c.id));
+  const allSelectedHavePlayerOverlay =
+    selectedClips.length > 0 &&
+    selectedClips.every((c) => c.edits.playerOverlay?.enabled !== false);
 
   const handleDragStart = (index: number) => {
     setDraggedClipIndex(index);
@@ -155,6 +162,20 @@ export const ClipWorkspacePanel: React.FC<ClipWorkspacePanelProps> = ({
             >
               <Type size={14} />
               <span>Text</span>
+            </button>
+
+            <button
+              className="toolbar-btn"
+              disabled={!someSelected}
+              onClick={onBatchPlayerOverlayToggle}
+              title="Toggle 1-2s Video Player HUD Overlay on selected clips (Anti-Copyright)"
+              style={{
+                color: allSelectedHavePlayerOverlay ? 'var(--accent-cyan)' : undefined,
+                borderColor: allSelectedHavePlayerOverlay ? 'var(--accent-cyan)' : undefined
+              }}
+            >
+              <MonitorPlay size={14} />
+              <span>Player HUD</span>
             </button>
 
             <button
@@ -267,6 +288,11 @@ export const ClipWorkspacePanel: React.FC<ClipWorkspacePanelProps> = ({
                     {clip.edits.rotation !== 0 && <span className="edit-tag">{clip.edits.rotation}°</span>}
                     {clip.edits.crop && <span className="edit-tag">Cropped</span>}
                     {clip.edits.textOverlay?.text && <span className="edit-tag">Text Overlay</span>}
+                    {clip.edits.playerOverlay?.enabled !== false && (
+                      <span className="edit-tag" style={{ color: 'var(--accent-cyan)', borderColor: 'rgba(6,182,212,0.4)', background: 'rgba(6,182,212,0.1)' }}>
+                        HUD {clip.edits.playerOverlay?.durationSec ?? 1.5}s
+                      </span>
+                    )}
                   </div>
 
                   {/* Processing Progress Bar if Processing */}
