@@ -13,7 +13,7 @@ import type {
   ExportProgress
 } from './types/video';
 import { MAX_CLIP_DURATION_SECONDS, parseTimestamp } from './utils/time';
-import { generateThumbnail } from './utils/thumbnail';
+import { generateThumbnail, createInstantThumbnail, generateThumbnailsInPool } from './utils/thumbnail';
 import { processClip } from './utils/videoProcessor';
 import { packageClipsToZip, triggerFileDownload } from './utils/zipPackager';
 import { saveProjectState, loadProjectState } from './utils/storage';
@@ -26,6 +26,7 @@ export const App: React.FC = () => {
   const [customDuration, setCustomDuration] = useState<number>(60);
   const [globalPlayerOverlayEnabled, setGlobalPlayerOverlayEnabled] = useState<boolean>(true);
   const [globalPlayerOverlayDuration, setGlobalPlayerOverlayDuration] = useState<number>(1.5);
+  const [exportConcurrency, setExportConcurrency] = useState<number>(2);
   const [manualTimestampsText, setManualTimestampsText] = useState<string>(
     '00:00.000 - 01:23.500\n01:23.500 - 02:40.000'
   );
@@ -181,8 +182,8 @@ export const App: React.FC = () => {
       const clipId = `clip_${Date.now()}_${i}_${Math.random().toString(36).substring(2, 7)}`;
       const duration = seg.end - seg.start;
 
-      // Extract thumbnail frame
-      const thumb = await generateThumbnail(sourceMetadata.url, seg.start + 0.1);
+      // Instant placeholder thumbnail (0ms wait time!)
+      const instantThumb = createInstantThumbnail(i, duration);
 
       const initialEdits = {
         startTime: seg.start,
@@ -204,7 +205,7 @@ export const App: React.FC = () => {
         startTime: seg.start,
         endTime: seg.end,
         duration: Math.min(MAX_CLIP_DURATION_SECONDS, duration),
-        thumbnail: thumb,
+        thumbnail: instantThumb,
         status: 'waiting',
         progress: 0,
         edits: initialEdits,
@@ -216,9 +217,16 @@ export const App: React.FC = () => {
       newSelectedIds.add(clipId);
     }
 
+    // Instantly display all clips in UI with 0ms delay!
     setClips(newClips);
     setSelectedClipIds(newSelectedIds);
     setIsGenerating(false);
+
+    // Rapidly populate real video frame thumbnails in background using single pooled video player
+    const clipInfos = newClips.map((c) => ({ id: c.id, timeSec: c.startTime + 0.1 }));
+    generateThumbnailsInPool(sourceMetadata.url, clipInfos, (clipId, dataUrl) => {
+      setClips((prev) => prev.map((c) => (c.id === clipId ? { ...c, thumbnail: dataUrl } : c)));
+    }).catch(() => {});
   };
 
   // Select / Deselect
@@ -566,77 +574,89 @@ export const App: React.FC = () => {
     }, 1000);
 
     try {
-      for (let i = 0; i < selectedList.length; i++) {
-        if (controller.signal.aborted) break;
+      const concurrency = Math.min(Math.max(1, exportConcurrency), selectedList.length);
+      let nextClipIndex = 0;
+      const progressMap = new Map<string, number>();
 
-        const currentClip = selectedList[i];
+      const runWorker = async () => {
+        while (nextClipIndex < selectedList.length && !controller.signal.aborted) {
+          const index = nextClipIndex++;
+          const currentClip = selectedList[index];
 
-        setExportProgress((prev) => ({
-          ...prev,
-          currentClipIndex: i,
-          currentClipProgress: 0
-        }));
+          setClips((prev) =>
+            prev.map((c) =>
+              c.id === currentClip.id ? { ...c, status: 'processing', progress: 0 } : c
+            )
+          );
 
-        setClips((prev) =>
-          prev.map((c) =>
-            c.id === currentClip.id ? { ...c, status: 'processing', progress: 0 } : c
-          )
-        );
+          try {
+            const result = await processClip({
+              sourceUrl: sourceMetadata.url,
+              clip: currentClip,
+              profile: compressionProfile,
+              signal: controller.signal,
+              onProgress: (p) => {
+                progressMap.set(currentClip.id, p);
 
-        try {
-          const result = await processClip({
-            sourceUrl: sourceMetadata.url,
-            clip: currentClip,
-            profile: compressionProfile,
-            signal: controller.signal,
-            onProgress: (p) => {
-              setExportProgress((prev) => {
-                const totalProgress = ((i + p / 100) / selectedList.length) * 100;
-                const elapsed = (Date.now() - prev.startTime) / 1000;
-                const estimatedTotal = totalProgress > 0 ? (elapsed / totalProgress) * 100 : 60;
+                // Calculate weighted progress across all selected clips
+                let totalAccumulated = 0;
+                for (const clip of selectedList) {
+                  totalAccumulated += progressMap.get(clip.id) || 0;
+                }
+                const totalProgress = (totalAccumulated / (selectedList.length * 100)) * 100;
+                const elapsed = (Date.now() - startTime) / 1000;
+                const estimatedTotal = totalProgress > 0 ? elapsed / (totalProgress / 100) : 60;
                 const remaining = Math.max(0, Math.round(estimatedTotal - elapsed));
-                return {
+
+                setExportProgress((prev) => ({
                   ...prev,
+                  currentClipIndex: index,
                   currentClipProgress: p,
-                  overallProgress: Math.round(totalProgress),
+                  overallProgress: Math.min(99, Math.round(totalProgress)),
                   estimatedRemainingSec: remaining
-                };
-              });
+                }));
 
-              setClips((prev) =>
-                prev.map((c) => (c.id === currentClip.id ? { ...c, progress: Math.round(p) } : c))
-              );
+                setClips((prev) =>
+                  prev.map((c) => (c.id === currentClip.id ? { ...c, progress: Math.round(p) } : c))
+                );
+              }
+            });
+
+            progressMap.set(currentClip.id, 100);
+
+            // Mark current clip completed
+            setClips((prev) =>
+              prev.map((c) =>
+                c.id === currentClip.id
+                  ? {
+                      ...c,
+                      status: 'completed',
+                      progress: 100,
+                      processedBlob: result.blob,
+                      actualSizeBytes: result.blob.size
+                    }
+                  : c
+              )
+            );
+          } catch (clipErr: unknown) {
+            if (clipErr instanceof DOMException && clipErr.name === 'AbortError') {
+              break;
             }
-          });
-
-          // Mark current clip completed
-          setClips((prev) =>
-            prev.map((c) =>
-              c.id === currentClip.id
-                ? {
-                    ...c,
-                    status: 'completed',
-                    progress: 100,
-                    processedBlob: result.blob,
-                    actualSizeBytes: result.blob.size
-                  }
-                : c
-            )
-          );
-        } catch (clipErr: unknown) {
-          if (clipErr instanceof DOMException && clipErr.name === 'AbortError') {
-            break;
+            console.error(`Clip processing error on #${index + 1}:`, clipErr);
+            setClips((prev) =>
+              prev.map((c) =>
+                c.id === currentClip.id
+                  ? { ...c, status: 'failed', error: (clipErr as Error).message }
+                  : c
+              )
+            );
           }
-          console.error(`Clip processing error on #${i + 1}:`, clipErr);
-          setClips((prev) =>
-            prev.map((c) =>
-              c.id === currentClip.id
-                ? { ...c, status: 'failed', error: (clipErr as Error).message }
-                : c
-            )
-          );
         }
-      }
+      };
+
+      // Run parallel encoder workers
+      const workers = Array.from({ length: concurrency }, () => runWorker());
+      await Promise.all(workers);
 
       // If not aborted, trigger packaging ZIP automatically
       if (!controller.signal.aborted) {
@@ -779,6 +799,8 @@ export const App: React.FC = () => {
           onToggleGlobalPlayerOverlay={handleToggleGlobalPlayerOverlay}
           globalPlayerOverlayDuration={globalPlayerOverlayDuration}
           onChangeGlobalPlayerOverlayDuration={handleChangeGlobalPlayerOverlayDuration}
+          exportConcurrency={exportConcurrency}
+          onConcurrencyChange={setExportConcurrency}
         />
       </main>
 

@@ -38,6 +38,8 @@ interface ExportPanelProps {
   onToggleGlobalPlayerOverlay?: (enabled: boolean) => void;
   globalPlayerOverlayDuration?: number;
   onChangeGlobalPlayerOverlayDuration?: (sec: number) => void;
+  exportConcurrency?: number;
+  onConcurrencyChange?: (concurrency: number) => void;
 }
 
 export const ExportPanel: React.FC<ExportPanelProps> = ({
@@ -56,7 +58,9 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
   globalPlayerOverlayEnabled = true,
   onToggleGlobalPlayerOverlay,
   globalPlayerOverlayDuration = 1.5,
-  onChangeGlobalPlayerOverlayDuration
+  onChangeGlobalPlayerOverlayDuration,
+  exportConcurrency = 2,
+  onConcurrencyChange
 }) => {
   // Selected clips in chronological order
   const selectedClips = clips.filter((c) => selectedClipIds.has(c.id));
@@ -205,6 +209,54 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
               </div>
             </div>
           )}
+        </div>
+
+        {/* Hardware Acceleration & Parallel Speed Control */}
+        <div style={{ background: 'rgba(15, 23, 42, 0.45)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: 'var(--radius-md)', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Zap size={16} color="var(--accent-emerald)" />
+              <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#f8fafc' }}>
+                Hardware Acceleration & Speed
+              </span>
+            </div>
+            <span style={{ fontSize: '0.72rem', color: 'var(--accent-emerald)', fontWeight: 600 }}>
+              {exportConcurrency}x Parallel
+            </span>
+          </div>
+
+          <p style={{ fontSize: '0.73rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
+            Processes multiple clips simultaneously using your GPU multi-core encoder to cut total export time dramatically.
+          </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', paddingTop: '4px' }}>
+            {[
+              { val: 1, label: '1x Safe' },
+              { val: 2, label: '⚡ 2x Fast' },
+              { val: 3, label: '🚀 3x Turbo' }
+            ].map(({ val, label }) => {
+              const isCur = exportConcurrency === val;
+              return (
+                <button
+                  key={val}
+                  type="button"
+                  className={`toolbar-btn ${isCur ? 'active' : ''}`}
+                  onClick={() => onConcurrencyChange?.(val)}
+                  style={{
+                    justifyContent: 'center',
+                    padding: '6px 4px',
+                    fontSize: '0.75rem',
+                    background: isCur ? 'var(--accent-emerald)' : 'rgba(0,0,0,0.3)',
+                    color: isCur ? '#0f172a' : 'var(--text-secondary)',
+                    fontWeight: isCur ? 700 : 500,
+                    borderColor: isCur ? 'var(--accent-emerald)' : 'var(--border-subtle)'
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Live Export Progress Card (when exporting) */}

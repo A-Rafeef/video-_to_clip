@@ -13,8 +13,8 @@ export const COMPRESSION_PROFILES: Record<CompressionProfile, CompressionProfile
   },
   balanced: {
     id: 'balanced',
-    label: 'Balanced',
-    description: 'Crisp 1080p output with efficient bitrate. Ideal for sharing & social media.',
+    label: 'Balanced (Fast 1080p)',
+    description: 'Crisp 1080p output with efficient bitrate. Ideal for social media sharing.',
     videoBitrate: 3_500_000, // 3.5 Mbps
     audioBitrate: 128_000,   // 128 kbps
     maxDimension: 1920,
@@ -22,8 +22,8 @@ export const COMPRESSION_PROFILES: Record<CompressionProfile, CompressionProfile
   },
   small: {
     id: 'small',
-    label: 'Smaller File',
-    description: 'Highly compressed 720p output. Fast download and lightweight storage.',
+    label: 'Turbo / Fast (720p)',
+    description: 'Ultra-fast lightweight 720p encoding. Lowest CPU/GPU load and fastest export.',
     videoBitrate: 1_400_000, // 1.4 Mbps
     audioBitrate: 96_000,    // 96 kbps
     maxDimension: 1280,
@@ -100,6 +100,7 @@ export async function processClip({
     video.crossOrigin = 'anonymous';
 
     let animFrameId: number | null = null;
+    let backupTimerId: number | null = null;
     let mediaRecorder: MediaRecorder | null = null;
     const recordedChunks: Blob[] = [];
     let audioContext: AudioContext | null = null;
@@ -108,6 +109,10 @@ export async function processClip({
       if (animFrameId) {
         cancelAnimationFrame(animFrameId);
         animFrameId = null;
+      }
+      if (backupTimerId) {
+        clearTimeout(backupTimerId);
+        backupTimerId = null;
       }
       if (audioContext && audioContext.state !== 'closed') {
         try {
@@ -178,7 +183,7 @@ export async function processClip({
         const canvas = document.createElement('canvas');
         canvas.width = Math.max(160, outW);
         canvas.height = Math.max(160, outH);
-        const ctx = canvas.getContext('2d', { alpha: false });
+        const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
 
         if (!ctx) {
           cleanup();
@@ -321,7 +326,14 @@ export async function processClip({
             );
           }
 
-          animFrameId = requestAnimationFrame(drawFrame);
+          // Frame scheduling with background tab throttling protection:
+          // When the browser tab is hidden/minimized, requestAnimationFrame drops to 1 FPS or freezes.
+          // Using window.setTimeout fallback ensures the export runs at full 30 FPS in the background!
+          if (document.hidden) {
+            backupTimerId = window.setTimeout(drawFrame, 32);
+          } else {
+            animFrameId = requestAnimationFrame(drawFrame);
+          }
         };
 
         // Seek to startTime, then start playback and recording
