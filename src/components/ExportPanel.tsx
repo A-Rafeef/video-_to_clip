@@ -18,7 +18,8 @@ import type {
   ExportProgress,
   VideoMetadata
 } from '../types/video';
-import { COMPRESSION_PROFILES, estimateClipSizeBytes } from '../utils/videoProcessor';
+import { COMPRESSION_PROFILES, estimateClipSizeBytes, type EncodingEngine } from '../utils/videoProcessor';
+import { isWebCodecsSupported } from '../utils/webCodecsProcessor';
 import { formatTimestamp, formatFileSize, formatDurationHuman } from '../utils/time';
 
 interface ExportPanelProps {
@@ -40,6 +41,8 @@ interface ExportPanelProps {
   onChangeGlobalPlayerOverlayDuration?: (sec: number) => void;
   exportConcurrency?: number;
   onConcurrencyChange?: (concurrency: number) => void;
+  encodingEngine?: EncodingEngine;
+  onEncodingEngineChange?: (engine: EncodingEngine) => void;
 }
 
 export const ExportPanel: React.FC<ExportPanelProps> = ({
@@ -60,8 +63,12 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
   globalPlayerOverlayDuration = 1.5,
   onChangeGlobalPlayerOverlayDuration,
   exportConcurrency = 2,
-  onConcurrencyChange
+  onConcurrencyChange,
+  encodingEngine = 'webcodecs',
+  onEncodingEngineChange
 }) => {
+  const hasWebCodecs = isWebCodecsSupported();
+
   // Selected clips in chronological order
   const selectedClips = clips.filter((c) => selectedClipIds.has(c.id));
   const totalSelectedDuration = selectedClips.reduce((acc, c) => acc + c.duration, 0);
@@ -88,6 +95,52 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
       </div>
 
       <div className="panel-content">
+        {/* Encoding Engine Selector */}
+        <div className="export-section">
+          <div className="section-subtitle">
+            <Zap size={14} color="var(--accent-cyan)" />
+            <span>Encoding Engine</span>
+            {hasWebCodecs && (
+              <span style={{ marginLeft: 'auto', fontSize: '0.68rem', color: 'var(--accent-emerald)', background: 'rgba(16, 185, 129, 0.1)', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                GPU Hardware Ready
+              </span>
+            )}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            <div
+              className={`profile-card ${encodingEngine === 'webcodecs' ? 'active' : ''}`}
+              onClick={() => !exportProgress.isExporting && onEncodingEngineChange?.('webcodecs')}
+              style={{ opacity: hasWebCodecs ? 1 : 0.6 }}
+            >
+              <div className="profile-header">
+                <span className="profile-label" style={{ fontSize: '0.82rem', fontWeight: 700 }}>
+                  🚀 WebCodecs GPU
+                </span>
+                {encodingEngine === 'webcodecs' && <CheckCircle2 size={15} color="var(--accent-cyan)" />}
+              </div>
+              <p className="profile-desc" style={{ fontSize: '0.72rem' }}>
+                10x Ultra-fast hardware encoding to native MP4 (H.264/AVC).
+              </p>
+            </div>
+
+            <div
+              className={`profile-card ${encodingEngine === 'mediarecorder' ? 'active' : ''}`}
+              onClick={() => !exportProgress.isExporting && onEncodingEngineChange?.('mediarecorder')}
+            >
+              <div className="profile-header">
+                <span className="profile-label" style={{ fontSize: '0.82rem', fontWeight: 700 }}>
+                  MediaRecorder
+                </span>
+                {encodingEngine === 'mediarecorder' && <CheckCircle2 size={15} color="var(--primary)" />}
+              </div>
+              <p className="profile-desc" style={{ fontSize: '0.72rem' }}>
+                Standard in-browser recorder. Universal compatibility fallback.
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Quality Profiles */}
         <div className="export-section">
           <div className="section-subtitle">

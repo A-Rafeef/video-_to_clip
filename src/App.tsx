@@ -14,7 +14,7 @@ import type {
 } from './types/video';
 import { MAX_CLIP_DURATION_SECONDS, parseTimestamp } from './utils/time';
 import { generateThumbnail, createInstantThumbnail, generateThumbnailsInPool } from './utils/thumbnail';
-import { processClip } from './utils/videoProcessor';
+import { processClip, type EncodingEngine } from './utils/videoProcessor';
 import { packageClipsToZip, triggerFileDownload } from './utils/zipPackager';
 import { saveProjectState, loadProjectState } from './utils/storage';
 import { DEFAULT_PLAYER_OVERLAY } from './utils/playerOverlay';
@@ -27,6 +27,7 @@ export const App: React.FC = () => {
   const [globalPlayerOverlayEnabled, setGlobalPlayerOverlayEnabled] = useState<boolean>(true);
   const [globalPlayerOverlayDuration, setGlobalPlayerOverlayDuration] = useState<number>(1.5);
   const [exportConcurrency, setExportConcurrency] = useState<number>(2);
+  const [encodingEngine, setEncodingEngine] = useState<EncodingEngine>('webcodecs');
   const [manualTimestampsText, setManualTimestampsText] = useState<string>(
     '00:00.000 - 01:23.500\n01:23.500 - 02:40.000'
   );
@@ -510,6 +511,7 @@ export const App: React.FC = () => {
         sourceUrl: sourceMetadata.url,
         clip,
         profile: compressionProfile,
+        engine: encodingEngine,
         signal: controller.signal,
         onProgress: (p) => {
           setClips((prev) =>
@@ -594,6 +596,7 @@ export const App: React.FC = () => {
               sourceUrl: sourceMetadata.url,
               clip: currentClip,
               profile: compressionProfile,
+              engine: encodingEngine,
               signal: controller.signal,
               onProgress: (p) => {
                 progressMap.set(currentClip.id, p);
@@ -801,6 +804,8 @@ export const App: React.FC = () => {
           onChangeGlobalPlayerOverlayDuration={handleChangeGlobalPlayerOverlayDuration}
           exportConcurrency={exportConcurrency}
           onConcurrencyChange={setExportConcurrency}
+          encodingEngine={encodingEngine}
+          onEncodingEngineChange={setEncodingEngine}
         />
       </main>
 

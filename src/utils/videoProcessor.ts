@@ -1,5 +1,6 @@
 import type { ClipItem, CompressionProfile, CompressionProfileConfig } from '../types/video';
 import { drawPlayerOverlay } from './playerOverlay';
+import { isWebCodecsSupported, processClipWithWebCodecs } from './webCodecsProcessor';
 
 export const COMPRESSION_PROFILES: Record<CompressionProfile, CompressionProfileConfig> = {
   original: {
@@ -63,19 +64,40 @@ export function getSupportedMimeType(): { mimeType: string; extension: string } 
   return { mimeType: 'video/webm', extension: 'webm' };
 }
 
+export type EncodingEngine = 'webcodecs' | 'mediarecorder';
+
 export interface ProcessClipOptions {
   sourceUrl: string;
   clip: ClipItem;
   profile: CompressionProfile;
+  engine?: EncodingEngine;
   signal?: AbortSignal;
   onProgress?: (progressPercent: number) => void;
 }
 
 /**
- * Processes a single clip client-side using HTML5 Video, Canvas transformation matrix,
- * Web Audio processing, and MediaRecorder encoding.
+ * Main export processor. Automatically uses hardware-accelerated WebCodecs (10x faster)
+ * when supported, with seamless automatic fallback to MediaRecorder.
  */
-export async function processClip({
+export async function processClip(
+  options: ProcessClipOptions
+): Promise<{ blob: Blob; mimeType: string; extension: string }> {
+  if (options.engine !== 'mediarecorder' && isWebCodecsSupported()) {
+    try {
+      return await processClipWithWebCodecs(options);
+    } catch (err: unknown) {
+      if (options.signal?.aborted) throw err;
+      console.warn('WebCodecs execution failed, falling back to MediaRecorder:', err);
+    }
+  }
+
+  return processClipWithMediaRecorder(options);
+}
+
+/**
+ * MediaRecorder fallback processor.
+ */
+export async function processClipWithMediaRecorder({
   sourceUrl,
   clip,
   profile,

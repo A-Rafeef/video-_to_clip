@@ -19,6 +19,7 @@
     "idb-keyval": "^6.3.0",
     "jszip": "^3.10.2",
     "lucide-react": "^1.43.0",
+    "mp4-muxer": "^5.2.2",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   }
