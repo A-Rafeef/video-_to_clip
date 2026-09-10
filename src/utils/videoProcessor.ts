@@ -1,9 +1,9 @@
 import type { ClipItem, CompressionProfile, CompressionProfileConfig } from '../types/video';
 import { drawPlayerOverlay } from './playerOverlay';
 import { isWebCodecsSupported, processClipWithWebCodecs } from './webCodecsProcessor';
-import { processClipLossless, clipRequiresReencoding } from './losslessProcessor';
+import { processClipLossless, clipRequiresReencoding, clearParsedMP4Cache } from './losslessProcessor';
 
-export { clipRequiresReencoding };
+export { clipRequiresReencoding, clearParsedMP4Cache };
 
 export const COMPRESSION_PROFILES: Record<CompressionProfile, CompressionProfileConfig> = {
   original: {

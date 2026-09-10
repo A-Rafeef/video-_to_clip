@@ -399,12 +399,22 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
               className="split-action-btn"
               onClick={onStartExport}
               disabled={selectedClips.length === 0}
+              style={{
+                background: encodingEngine === 'lossless'
+                  ? 'linear-gradient(135deg, #059669 0%, #10b981 100%)'
+                  : undefined,
+                boxShadow: encodingEngine === 'lossless'
+                  ? '0 4px 20px rgba(16, 185, 129, 0.35)'
+                  : undefined
+              }}
             >
               <Zap size={16} />
               <span>
                 {completedCount === selectedClips.length && selectedClips.length > 0
                   ? 'Re-process & Package ZIP'
-                  : `Process & Export ${selectedClips.length} Clips`}
+                  : encodingEngine === 'lossless'
+                  ? `⚡ Instant Export ${selectedClips.length} Clips (Milliseconds / 1000x Speed)`
+                  : `🚀 Turbo Export ${selectedClips.length} Clips (GPU Mode)`}
               </span>
             </button>
           )}

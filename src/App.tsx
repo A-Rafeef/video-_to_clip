@@ -14,7 +14,7 @@ import type {
 } from './types/video';
 import { MAX_CLIP_DURATION_SECONDS, parseTimestamp } from './utils/time';
 import { generateThumbnail, createInstantThumbnail, generateThumbnailsInPool } from './utils/thumbnail';
-import { processClip, type EncodingEngine } from './utils/videoProcessor';
+import { processClip, type EncodingEngine, clearParsedMP4Cache } from './utils/videoProcessor';
 import { packageClipsToZip, triggerFileDownload } from './utils/zipPackager';
 import { saveProjectState, loadProjectState } from './utils/storage';
 import { DEFAULT_PLAYER_OVERLAY } from './utils/playerOverlay';
@@ -24,10 +24,10 @@ export const App: React.FC = () => {
   const [sourceMetadata, setSourceMetadata] = useState<VideoMetadata | null>(null);
   const [splitStrategy, setSplitStrategy] = useState<SplitStrategyType>('90s');
   const [customDuration, setCustomDuration] = useState<number>(60);
-  const [globalPlayerOverlayEnabled, setGlobalPlayerOverlayEnabled] = useState<boolean>(true);
+  const [globalPlayerOverlayEnabled, setGlobalPlayerOverlayEnabled] = useState<boolean>(false);
   const [globalPlayerOverlayDuration, setGlobalPlayerOverlayDuration] = useState<number>(1.5);
-  const [exportConcurrency, setExportConcurrency] = useState<number>(2);
-  const [encodingEngine, setEncodingEngine] = useState<EncodingEngine>('webcodecs');
+  const [exportConcurrency, setExportConcurrency] = useState<number>(4);
+  const [encodingEngine, setEncodingEngine] = useState<EncodingEngine>('lossless');
   const [manualTimestampsText, setManualTimestampsText] = useState<string>(
     '00:00.000 - 01:23.500\n01:23.500 - 02:40.000'
   );
@@ -98,6 +98,7 @@ export const App: React.FC = () => {
 
   // Video loaded handler
   const handleVideoLoaded = (meta: VideoMetadata) => {
+    clearParsedMP4Cache();
     setSourceMetadata(meta);
     // Derive sensible default project name from filename
     const cleanName = meta.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
@@ -108,6 +109,7 @@ export const App: React.FC = () => {
 
   // Reset project
   const handleResetProject = () => {
+    clearParsedMP4Cache();
     if (sourceMetadata?.url) {
       URL.revokeObjectURL(sourceMetadata.url);
     }
@@ -392,6 +394,9 @@ export const App: React.FC = () => {
   // Global toggle for all clips from ExportPanel
   const handleToggleGlobalPlayerOverlay = (enabled: boolean) => {
     setGlobalPlayerOverlayEnabled(enabled);
+    if (enabled && encodingEngine === 'lossless') {
+      setEncodingEngine('webcodecs');
+    }
     setClips((prev) =>
       prev.map((clip) => {
         const currentOverlay = clip.edits.playerOverlay || DEFAULT_PLAYER_OVERLAY;
