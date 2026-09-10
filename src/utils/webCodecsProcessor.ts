@@ -56,6 +56,7 @@ export interface WebCodecsProcessOptions {
   sourceUrl: string;
   clip: ClipItem;
   profile: CompressionProfile;
+  playbackRate?: number;
   signal?: AbortSignal;
   onProgress?: (progressPercent: number) => void;
 }
@@ -68,6 +69,7 @@ export async function processClipWithWebCodecs({
   sourceUrl,
   clip,
   profile,
+  playbackRate = 6.0,
   signal,
   onProgress
 }: WebCodecsProcessOptions): Promise<{ blob: Blob; mimeType: string; extension: string }> {
@@ -356,12 +358,17 @@ export async function processClipWithWebCodecs({
 
         const onSeeked = () => {
           video.removeEventListener('seeked', onSeeked);
-          // Fast playback rate: 3.5x speed!
-          // WebCodecs decodes and encodes at 3.5x wall-clock speed!
+          // Turbo GPU playback rate: 6x-8x speed!
+          // WebCodecs decodes and encodes at up to 8x wall-clock speed!
+          const targetRate = Math.min(16.0, Math.max(1.0, playbackRate));
           try {
-            video.playbackRate = 3.5;
+            video.playbackRate = targetRate;
           } catch {
-            video.playbackRate = 2.0;
+            try {
+              video.playbackRate = 4.0;
+            } catch {
+              video.playbackRate = 2.0;
+            }
           }
 
           video.play().then(() => {

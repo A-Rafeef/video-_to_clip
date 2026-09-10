@@ -433,6 +433,26 @@ export const App: React.FC = () => {
     );
   };
 
+  // Engine change handler - disables player overlay when switching to lossless
+  const handleEncodingEngineChange = (engine: EncodingEngine) => {
+    setEncodingEngine(engine);
+    if (engine === 'lossless') {
+      setGlobalPlayerOverlayEnabled(false);
+      setClips((prev) =>
+        prev.map((clip) => ({
+          ...clip,
+          edits: {
+            ...clip.edits,
+            playerOverlay: {
+              ...(clip.edits.playerOverlay || DEFAULT_PLAYER_OVERLAY),
+              enabled: false
+            }
+          }
+        }))
+      );
+    }
+  };
+
   // Reorder clips (HTML5 drag & drop or buttons)
   const handleReorderClip = (fromIndex: number, toIndex: number) => {
     setClips((prev) => {
@@ -509,6 +529,7 @@ export const App: React.FC = () => {
     try {
       const result = await processClip({
         sourceUrl: sourceMetadata.url,
+        sourceFile: sourceMetadata.file,
         clip,
         profile: compressionProfile,
         engine: encodingEngine,
@@ -594,6 +615,7 @@ export const App: React.FC = () => {
           try {
             const result = await processClip({
               sourceUrl: sourceMetadata.url,
+              sourceFile: sourceMetadata.file,
               clip: currentClip,
               profile: compressionProfile,
               engine: encodingEngine,
@@ -805,7 +827,7 @@ export const App: React.FC = () => {
           exportConcurrency={exportConcurrency}
           onConcurrencyChange={setExportConcurrency}
           encodingEngine={encodingEngine}
-          onEncodingEngineChange={setEncodingEngine}
+          onEncodingEngineChange={handleEncodingEngineChange}
         />
       </main>
 

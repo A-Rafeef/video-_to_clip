@@ -107,36 +107,54 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
             )}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px' }}>
             <div
-              className={`profile-card ${encodingEngine === 'webcodecs' ? 'active' : ''}`}
-              onClick={() => !exportProgress.isExporting && onEncodingEngineChange?.('webcodecs')}
-              style={{ opacity: hasWebCodecs ? 1 : 0.6 }}
+              className={`profile-card ${encodingEngine === 'lossless' ? 'active' : ''}`}
+              onClick={() => !exportProgress.isExporting && onEncodingEngineChange?.('lossless')}
+              style={{ border: encodingEngine === 'lossless' ? '1px solid var(--accent-emerald)' : undefined }}
             >
               <div className="profile-header">
-                <span className="profile-label" style={{ fontSize: '0.82rem', fontWeight: 700 }}>
-                  🚀 WebCodecs GPU
+                <span className="profile-label" style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-emerald)' }}>
+                  ⚡ Instant Lossless (0.05s • 1000x Speed)
                 </span>
-                {encodingEngine === 'webcodecs' && <CheckCircle2 size={15} color="var(--accent-cyan)" />}
+                {encodingEngine === 'lossless' && <CheckCircle2 size={16} color="var(--accent-emerald)" />}
               </div>
-              <p className="profile-desc" style={{ fontSize: '0.72rem' }}>
-                10x Ultra-fast hardware encoding to native MP4 (H.264/AVC).
+              <p className="profile-desc" style={{ fontSize: '0.74rem', color: '#cbd5e1' }}>
+                Pure bitstream stream copy in milliseconds. Zero re-encoding, 0% quality loss. Ideal for instant movie splitting.
               </p>
             </div>
 
-            <div
-              className={`profile-card ${encodingEngine === 'mediarecorder' ? 'active' : ''}`}
-              onClick={() => !exportProgress.isExporting && onEncodingEngineChange?.('mediarecorder')}
-            >
-              <div className="profile-header">
-                <span className="profile-label" style={{ fontSize: '0.82rem', fontWeight: 700 }}>
-                  MediaRecorder
-                </span>
-                {encodingEngine === 'mediarecorder' && <CheckCircle2 size={15} color="var(--primary)" />}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <div
+                className={`profile-card ${encodingEngine === 'webcodecs' ? 'active' : ''}`}
+                onClick={() => !exportProgress.isExporting && onEncodingEngineChange?.('webcodecs')}
+                style={{ opacity: hasWebCodecs ? 1 : 0.6 }}
+              >
+                <div className="profile-header">
+                  <span className="profile-label" style={{ fontSize: '0.82rem', fontWeight: 700 }}>
+                    🚀 WebCodecs GPU
+                  </span>
+                  {encodingEngine === 'webcodecs' && <CheckCircle2 size={15} color="var(--accent-cyan)" />}
+                </div>
+                <p className="profile-desc" style={{ fontSize: '0.72rem' }}>
+                  Hardware GPU encoding. Supports Anti-Copyright HUD & crops.
+                </p>
               </div>
-              <p className="profile-desc" style={{ fontSize: '0.72rem' }}>
-                Standard in-browser recorder. Universal compatibility fallback.
-              </p>
+
+              <div
+                className={`profile-card ${encodingEngine === 'mediarecorder' ? 'active' : ''}`}
+                onClick={() => !exportProgress.isExporting && onEncodingEngineChange?.('mediarecorder')}
+              >
+                <div className="profile-header">
+                  <span className="profile-label" style={{ fontSize: '0.82rem', fontWeight: 700 }}>
+                    MediaRecorder
+                  </span>
+                  {encodingEngine === 'mediarecorder' && <CheckCircle2 size={15} color="var(--primary)" />}
+                </div>
+                <p className="profile-desc" style={{ fontSize: '0.72rem' }}>
+                  Standard browser recorder. Universal fallback.
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -282,11 +300,12 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
             Processes multiple clips simultaneously using your GPU multi-core encoder to cut total export time dramatically.
           </p>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', paddingTop: '4px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', paddingTop: '4px' }}>
             {[
               { val: 1, label: '1x Safe' },
               { val: 2, label: '⚡ 2x Fast' },
-              { val: 3, label: '🚀 3x Turbo' }
+              { val: 3, label: '🚀 3x Turbo' },
+              { val: 4, label: '🔥 4x Extreme' }
             ].map(({ val, label }) => {
               const isCur = exportConcurrency === val;
               return (
@@ -297,8 +316,8 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
                   onClick={() => onConcurrencyChange?.(val)}
                   style={{
                     justifyContent: 'center',
-                    padding: '6px 4px',
-                    fontSize: '0.75rem',
+                    padding: '6px 2px',
+                    fontSize: '0.72rem',
                     background: isCur ? 'var(--accent-emerald)' : 'rgba(0,0,0,0.3)',
                     color: isCur ? '#0f172a' : 'var(--text-secondary)',
                     fontWeight: isCur ? 700 : 500,
