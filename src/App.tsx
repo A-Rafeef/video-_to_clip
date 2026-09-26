@@ -6,6 +6,7 @@ import { ExportPanel } from './components/ExportPanel';
 import { VideoEditorModal } from './components/VideoEditorModal';
 import { QuickPreviewModal } from './components/QuickPreviewModal';
 import { ExportModal, type ZipResult } from './components/ExportModal';
+import { BottomActionDock } from './components/BottomActionDock';
 import type {
   VideoMetadata,
   SplitStrategyType,
@@ -878,6 +879,26 @@ export const App: React.FC = () => {
           onEncodingEngineChange={handleEncodingEngineChange}
         />
       </main>
+
+      {/* Persistent Bottom Action Overlay Dock */}
+      <BottomActionDock
+        clips={clips}
+        selectedClipIds={selectedClipIds}
+        onSelectAll={handleSelectAll}
+        onDeselectAll={handleDeselectAll}
+        exportProgress={exportProgress}
+        onStartExport={handleStartExport}
+        onCancelExport={handleCancelExport}
+        onDownloadZip={handleDownloadZip}
+        zipResult={zipResult}
+        onOpenExportModal={() => {
+          setIsExportModalOpen(true);
+          setIsExportModalMinimized(false);
+        }}
+        encodingEngine={encodingEngine}
+        onEncodingEngineChange={handleEncodingEngineChange}
+        sourceMetadata={sourceMetadata}
+      />
 
       {/* Frame-Accurate Video Editor Modal */}
       {activeEditorClip && sourceMetadata && (
