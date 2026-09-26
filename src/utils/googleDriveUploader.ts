@@ -1,6 +1,7 @@
 // Google Drive Upload Utility using Google Identity Services (GIS) & Drive API v3
 
 export const DEFAULT_GOOGLE_CLIENT_ID =
+  (import.meta.env.VITE_GOOGLE_CLIENT_ID as string) ||
   '730295812346-vi4lqlf87qp85o97r1j54o0u10ivugfh.apps.googleusercontent.com';
 
 const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
