@@ -5,6 +5,7 @@ import { ClipWorkspacePanel } from './components/ClipWorkspacePanel';
 import { ExportPanel } from './components/ExportPanel';
 import { VideoEditorModal } from './components/VideoEditorModal';
 import { QuickPreviewModal } from './components/QuickPreviewModal';
+import { ExportModal, type ZipResult } from './components/ExportModal';
 import type {
   VideoMetadata,
   SplitStrategyType,
@@ -39,6 +40,9 @@ export const App: React.FC = () => {
   // Modals
   const [activeEditorClip, setActiveEditorClip] = useState<ClipItem | null>(null);
   const [activePreviewClip, setActivePreviewClip] = useState<ClipItem | null>(null);
+  const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
+  const [isExportModalMinimized, setIsExportModalMinimized] = useState<boolean>(false);
+  const [zipResult, setZipResult] = useState<ZipResult | null>(null);
 
   // Export & Compression
   const [compressionProfile, setCompressionProfile] = useState<CompressionProfile>('balanced');
@@ -575,6 +579,10 @@ export const App: React.FC = () => {
     const selectedList = clips.filter((c) => selectedClipIds.has(c.id));
     if (selectedList.length === 0) return;
 
+    setZipResult(null);
+    setIsExportModalOpen(true);
+    setIsExportModalMinimized(false);
+
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
@@ -709,6 +717,14 @@ export const App: React.FC = () => {
             }
           })
             .then(({ zipBlob, zipFilename }) => {
+              const res: ZipResult = {
+                blob: zipBlob,
+                filename: zipFilename,
+                size: zipBlob.size
+              };
+              setZipResult(res);
+              setIsExportModalOpen(true);
+              setIsExportModalMinimized(false);
               triggerFileDownload(zipBlob, zipFilename);
             })
             .catch((zipErr) => {
@@ -753,16 +769,43 @@ export const App: React.FC = () => {
       return;
     }
 
+    if (zipResult) {
+      setIsExportModalOpen(true);
+      setIsExportModalMinimized(false);
+      return;
+    }
+
     try {
+      setIsExportModalOpen(true);
+      setIsExportModalMinimized(false);
+      setExportProgress((prev) => ({
+        ...prev,
+        isExporting: true,
+        isZipping: true,
+        zipProgress: 0,
+        totalClips: selectedCompleted.length
+      }));
+
       const { zipBlob, zipFilename } = await packageClipsToZip({
         projectName,
         clips: selectedCompleted,
         sourceMetadata,
-        includeManifest
+        includeManifest,
+        onProgress: (p) => {
+          setExportProgress((prev) => ({ ...prev, zipProgress: p }));
+        }
       });
+      const res: ZipResult = {
+        blob: zipBlob,
+        filename: zipFilename,
+        size: zipBlob.size
+      };
+      setZipResult(res);
       triggerFileDownload(zipBlob, zipFilename);
     } catch (err: unknown) {
       alert(`Download failed: ${(err as Error).message}`);
+    } finally {
+      setExportProgress((prev) => ({ ...prev, isExporting: false, isZipping: false }));
     }
   };
 
@@ -857,6 +900,24 @@ export const App: React.FC = () => {
           onClose={() => setActivePreviewClip(null)}
         />
       )}
+
+      {/* Export Progress & Download Pop-Up Modal */}
+      <ExportModal
+        isOpen={isExportModalOpen}
+        isMinimized={isExportModalMinimized}
+        onClose={() => setIsExportModalOpen(false)}
+        onMinimize={() => setIsExportModalMinimized(true)}
+        onRestore={() => setIsExportModalMinimized(false)}
+        exportProgress={exportProgress}
+        onCancelExport={handleCancelExport}
+        clips={clips}
+        selectedClipIds={selectedClipIds}
+        sourceMetadata={sourceMetadata}
+        projectName={projectName}
+        encodingEngine={encodingEngine}
+        zipResult={zipResult}
+        onQuickPreview={(clip) => setActivePreviewClip(clip)}
+      />
     </div>
   );
 };
