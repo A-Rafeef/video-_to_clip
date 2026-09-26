@@ -1641,4 +1641,118 @@ html, body {
   font-family: var(--font-mono);
 }
 
+/* ==========================================================================
+   Google Drive Upload Section Styles
+   ========================================================================== */
+
+.google-drive-cta-btn {
+  padding: 14px 18px;
+  border-radius: var(--radius-md);
+  background: rgba(14, 165, 233, 0.12);
+  border: 1px solid rgba(14, 165, 233, 0.4);
+  color: #38bdf8;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.google-drive-cta-btn:hover:not(:disabled) {
+  background: rgba(14, 165, 233, 0.22);
+  border-color: #38bdf8;
+  color: #fff;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(14, 165, 233, 0.35);
+}
+.google-drive-cta-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.google-drive-progress-card {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(14, 165, 233, 0.3);
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+  box-shadow: 0 0 20px rgba(14, 165, 233, 0.15);
+}
+
+.google-drive-bar-track {
+  width: 100%;
+  height: 8px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.google-drive-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #38bdf8, #10b981, #f59e0b);
+  transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 15px rgba(56, 189, 248, 0.5);
+}
+
+.google-drive-success-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+  animation: slideUpHUD 0.25s ease;
+}
+
+.drive-success-badge {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(16, 185, 129, 0.2);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.google-drive-link-btn {
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-emerald);
+  color: #0f172a;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+  border: none;
+}
+.google-drive-link-btn:hover {
+  background: #34d399;
+  transform: translateY(-1px);
+}
+.google-drive-link-btn.copy {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border: 1px solid var(--border-subtle);
+}
+.google-drive-link-btn.copy:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.google-drive-error-card {
+  background: rgba(244, 63, 94, 0.1);
+  border: 1px solid rgba(244, 63, 94, 0.3);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+}
+
+
 

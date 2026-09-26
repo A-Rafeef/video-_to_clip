@@ -14,12 +14,23 @@ import {
   Play,
   FileCheck,
   Sparkles,
-  HardDrive
+  HardDrive,
+  CloudUpload,
+  ExternalLink,
+  Copy,
+  Check,
+  AlertCircle
 } from 'lucide-react';
 import type { ClipItem, ExportProgress, VideoMetadata } from '../types/video';
 import type { EncodingEngine } from '../utils/videoProcessor';
 import { formatTimestamp, formatFileSize, formatDurationHuman } from '../utils/time';
 import { triggerFileDownload } from '../utils/zipPackager';
+import {
+  DEFAULT_GOOGLE_CLIENT_ID,
+  requestGoogleAccessToken,
+  uploadBlobToGoogleDrive,
+  type GoogleDriveUploadResult
+} from '../utils/googleDriveUploader';
 
 export interface ZipResult {
   blob: Blob;
@@ -63,6 +74,16 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   const [downloadedZip, setDownloadedZip] = useState(false);
   const [downloadedClipIds, setDownloadedClipIds] = useState<Set<string>>(new Set());
 
+  // Google Drive Upload State
+  const [driveUploading, setDriveUploading] = useState(false);
+  const [driveUploadProgress, setDriveUploadProgress] = useState(0);
+  const [driveUploadBytes, setDriveUploadBytes] = useState<{ loaded: number; total: number }>({ loaded: 0, total: 0 });
+  const [driveUploadResult, setDriveUploadResult] = useState<GoogleDriveUploadResult | null>(null);
+  const [driveUploadError, setDriveUploadError] = useState<string | null>(null);
+  const [copiedDriveLink, setCopiedDriveLink] = useState(false);
+  const [googleClientId, setGoogleClientId] = useState(DEFAULT_GOOGLE_CLIENT_ID);
+  const [showDriveSettings, setShowDriveSettings] = useState(false);
+
   if (!isOpen) return null;
 
   const selectedClips = clips.filter((c) => selectedClipIds.has(c.id));
@@ -76,6 +97,40 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     if (!zipResult) return;
     triggerFileDownload(zipResult.blob, zipResult.filename);
     setDownloadedZip(true);
+  };
+
+  // Upload ZIP directly to Google Drive
+  const handleUploadToDrive = async () => {
+    if (!zipResult) return;
+    setDriveUploading(true);
+    setDriveUploadError(null);
+    setDriveUploadProgress(0);
+
+    try {
+      const token = await requestGoogleAccessToken(googleClientId.trim() || DEFAULT_GOOGLE_CLIENT_ID);
+      const result = await uploadBlobToGoogleDrive({
+        accessToken: token,
+        blob: zipResult.blob,
+        filename: zipResult.filename,
+        onProgress: (percent, loaded, total) => {
+          setDriveUploadProgress(percent);
+          setDriveUploadBytes({ loaded, total });
+        }
+      });
+      setDriveUploadResult(result);
+    } catch (err: unknown) {
+      console.error('Google Drive upload error:', err);
+      setDriveUploadError((err as Error).message || 'Failed to upload to Google Drive');
+    } finally {
+      setDriveUploading(false);
+    }
+  };
+
+  const handleCopyDriveLink = () => {
+    if (!driveUploadResult?.driveUrl) return;
+    navigator.clipboard.writeText(driveUploadResult.driveUrl);
+    setCopiedDriveLink(true);
+    setTimeout(() => setCopiedDriveLink(false), 2500);
   };
 
   // Trigger single clip download
@@ -434,19 +489,150 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                   </div>
                 </div>
 
-                {/* Primary Download CTA Button */}
-                <button
-                  className="download-cta-btn"
-                  onClick={handleDownloadZip}
-                >
-                  <Download size={20} />
-                  <span>
-                    {downloadedZip ? 'Download ZIP Again' : 'Download ZIP Archive'}
-                  </span>
-                  <span className="download-size-pill">
-                    {formatFileSize(zipResult.size)}
-                  </span>
-                </button>
+                {/* Primary Download & Google Drive Action Buttons */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <button
+                    className="download-cta-btn"
+                    onClick={handleDownloadZip}
+                  >
+                    <Download size={18} />
+                    <span>
+                      {downloadedZip ? 'Download Again' : 'Download ZIP'}
+                    </span>
+                    <span className="download-size-pill">
+                      {formatFileSize(zipResult.size)}
+                    </span>
+                  </button>
+
+                  <button
+                    className="google-drive-cta-btn"
+                    onClick={handleUploadToDrive}
+                    disabled={driveUploading}
+                  >
+                    {driveUploading ? (
+                      <Loader2 size={18} className="spin" color="#38bdf8" />
+                    ) : (
+                      <CloudUpload size={18} color="#38bdf8" />
+                    )}
+                    <span>
+                      {driveUploading
+                        ? 'Uploading to Drive...'
+                        : driveUploadResult
+                        ? 'Re-upload to Drive'
+                        : 'Upload to Google Drive'}
+                    </span>
+                  </button>
+                </div>
+
+                {/* Google Drive Uploading Live Progress Bar */}
+                {driveUploading && (
+                  <div className="google-drive-progress-card">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Loader2 size={16} className="spin" color="#38bdf8" />
+                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff' }}>
+                          Streaming ZIP directly to Google Drive...
+                        </span>
+                      </div>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem', fontWeight: 800, color: '#38bdf8' }}>
+                        {driveUploadProgress}%
+                      </span>
+                    </div>
+
+                    <div className="google-drive-bar-track">
+                      <div
+                        className="google-drive-bar-fill"
+                        style={{ width: `${driveUploadProgress}%` }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      <span>{zipResult.filename}</span>
+                      <span style={{ fontFamily: 'var(--font-mono)', color: '#cbd5e1' }}>
+                        {formatFileSize(driveUploadBytes.loaded)} / {formatFileSize(driveUploadBytes.total || zipResult.size)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Google Drive Upload Success Banner */}
+                {driveUploadResult && !driveUploading && (
+                  <div className="google-drive-success-card">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div className="drive-success-badge">
+                        <CheckCircle2 size={22} color="var(--accent-emerald)" />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#fff' }}>
+                          Uploaded to Google Drive!
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                          File is securely saved to your Google Drive account
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <a
+                        href={driveUploadResult.driveUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="google-drive-link-btn"
+                        style={{ textDecoration: 'none' }}
+                      >
+                        <ExternalLink size={14} />
+                        <span>Open in Drive</span>
+                      </a>
+
+                      <button
+                        className="google-drive-link-btn copy"
+                        onClick={handleCopyDriveLink}
+                        title="Copy shareable Google Drive link"
+                      >
+                        {copiedDriveLink ? <Check size={14} /> : <Copy size={14} />}
+                        <span>{copiedDriveLink ? 'Copied!' : 'Copy Link'}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Google Drive Upload Error Banner */}
+                {driveUploadError && !driveUploading && (
+                  <div className="google-drive-error-card">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <AlertCircle size={16} color="var(--accent-rose)" />
+                      <span style={{ fontSize: '0.78rem', color: '#fb7185', fontWeight: 600 }}>
+                        {driveUploadError}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px' }}>
+                      <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: 0 }}>
+                        Ensure <code>{window.location.origin}</code> is in Authorized JavaScript Origins in Google Cloud Console.
+                      </p>
+                      <button
+                        className="toolbar-btn"
+                        onClick={() => setShowDriveSettings(!showDriveSettings)}
+                        style={{ padding: '3px 8px', fontSize: '0.68rem' }}
+                      >
+                        {showDriveSettings ? 'Hide Client ID' : 'Edit Client ID'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Optional Client ID Customizer */}
+                {showDriveSettings && (
+                  <div style={{ background: 'rgba(0,0,0,0.3)', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Google OAuth Client ID:</span>
+                    <input
+                      type="text"
+                      className="header-project-input"
+                      value={googleClientId}
+                      onChange={(e) => setGoogleClientId(e.target.value)}
+                      style={{ width: '100%', fontSize: '0.72rem', padding: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', marginTop: '4px' }}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Individual Clips Download Option */}
