@@ -886,6 +886,10 @@ export const App: React.FC = () => {
         selectedClipIds={selectedClipIds}
         onSelectAll={handleSelectAll}
         onDeselectAll={handleDeselectAll}
+        onBatchMuteToggle={handleBatchMuteToggle}
+        onBatchRotate={handleBatchRotate}
+        onBatchCropRatio={handleBatchCropRatio}
+        onBatchDelete={handleBatchDelete}
         exportProgress={exportProgress}
         onStartExport={handleStartExport}
         onCancelExport={handleCancelExport}
@@ -898,6 +902,8 @@ export const App: React.FC = () => {
         encodingEngine={encodingEngine}
         onEncodingEngineChange={handleEncodingEngineChange}
         sourceMetadata={sourceMetadata}
+        onGenerateClips={handleGenerateClips}
+        isGenerating={isGenerating}
       />
 
       {/* Frame-Accurate Video Editor Modal */}
