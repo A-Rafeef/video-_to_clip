@@ -19,12 +19,19 @@ import {
   ExternalLink,
   Copy,
   Check,
-  AlertCircle
+  AlertCircle,
+  QrCode,
+  Globe,
+  Share2
 } from 'lucide-react';
 import type { ClipItem, ExportProgress, VideoMetadata } from '../types/video';
 import type { EncodingEngine } from '../utils/videoProcessor';
 import { formatTimestamp, formatFileSize, formatDurationHuman } from '../utils/time';
 import { triggerFileDownload } from '../utils/zipPackager';
+import {
+  uploadToAnonymousCloud,
+  type AnonymousUploadResult
+} from '../utils/anonymousCloudUploader';
 import {
   DEFAULT_GOOGLE_CLIENT_ID,
   requestGoogleAccessToken,
@@ -84,6 +91,15 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   const [googleClientId, setGoogleClientId] = useState(DEFAULT_GOOGLE_CLIENT_ID);
   const [showDriveSettings, setShowDriveSettings] = useState(false);
 
+  // 1-Click Anonymous Cloud Upload State (No Login Required)
+  const [cloudUploading, setCloudUploading] = useState(false);
+  const [cloudUploadProgress, setCloudUploadProgress] = useState(0);
+  const [cloudUploadBytes, setCloudUploadBytes] = useState<{ loaded: number; total: number }>({ loaded: 0, total: 0 });
+  const [cloudUploadResult, setCloudUploadResult] = useState<AnonymousUploadResult | null>(null);
+  const [cloudUploadError, setCloudUploadError] = useState<string | null>(null);
+  const [copiedCloudLink, setCopiedCloudLink] = useState(false);
+  const [showQrCode, setShowQrCode] = useState(false);
+
   if (!isOpen) return null;
 
   const selectedClips = clips.filter((c) => selectedClipIds.has(c.id));
@@ -131,6 +147,37 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     navigator.clipboard.writeText(driveUploadResult.driveUrl);
     setCopiedDriveLink(true);
     setTimeout(() => setCopiedDriveLink(false), 2500);
+  };
+
+  // 1-Click Anonymous Cloud Upload (No Login Required)
+  const handleUploadToAnonymousCloud = async () => {
+    if (!zipResult) return;
+    setCloudUploading(true);
+    setCloudUploadError(null);
+    setCloudUploadProgress(0);
+
+    try {
+      const result = await uploadToAnonymousCloud({
+        blob: zipResult.blob,
+        filename: zipResult.filename,
+        onProgress: (percent, loaded, total) => {
+          setCloudUploadProgress(percent);
+          setCloudUploadBytes({ loaded, total });
+        }
+      });
+      setCloudUploadResult(result);
+    } catch (err: unknown) {
+      console.error('Anonymous cloud upload error:', err);
+      setCloudUploadError((err as Error).message || 'Failed to upload to cloud');
+    } finally {
+      setCloudUploading(false);
+    }
+  };
+
+  const handleCopyCloudLink = (url: string) => {
+    navigator.clipboard.writeText(url);
+    setCopiedCloudLink(true);
+    setTimeout(() => setCopiedCloudLink(false), 2500);
   };
 
   // Trigger single clip download
@@ -489,13 +536,15 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                   </div>
                 </div>
 
-                {/* Primary Download & Google Drive Action Buttons */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                {/* Primary Download & Cloud Upload Action Buttons */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
+                  {/* Option 1: Direct Browser File Download */}
                   <button
                     className="download-cta-btn"
                     onClick={handleDownloadZip}
+                    title="Download ZIP archive to your local device"
                   >
-                    <Download size={18} />
+                    <Download size={17} />
                     <span>
                       {downloadedZip ? 'Download Again' : 'Download ZIP'}
                     </span>
@@ -504,15 +553,38 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                     </span>
                   </button>
 
+                  {/* Option 2: 1-Click Cloud Link (No Login Required) */}
+                  <button
+                    className="anonymous-cloud-cta-btn"
+                    onClick={handleUploadToAnonymousCloud}
+                    disabled={cloudUploading}
+                    title="Upload to Cloud instantly with NO login, account, or password needed"
+                  >
+                    {cloudUploading ? (
+                      <Loader2 size={17} className="spin" color="var(--accent-purple)" />
+                    ) : (
+                      <Zap size={17} color="var(--accent-emerald)" />
+                    )}
+                    <span>
+                      {cloudUploading
+                        ? 'Uploading to Cloud...'
+                        : cloudUploadResult
+                        ? 'Re-upload to Cloud'
+                        : '⚡ 1-Click Cloud Link (No Login)'}
+                    </span>
+                  </button>
+
+                  {/* Option 3: Google Drive Upload */}
                   <button
                     className="google-drive-cta-btn"
                     onClick={handleUploadToDrive}
                     disabled={driveUploading}
+                    title="Save permanently to your Google Drive account"
                   >
                     {driveUploading ? (
-                      <Loader2 size={18} className="spin" color="#38bdf8" />
+                      <Loader2 size={17} className="spin" color="#38bdf8" />
                     ) : (
-                      <CloudUpload size={18} color="#38bdf8" />
+                      <CloudUpload size={17} color="#38bdf8" />
                     )}
                     <span>
                       {driveUploading
@@ -523,6 +595,137 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                     </span>
                   </button>
                 </div>
+
+                {/* 1-Click Cloud Upload Live Progress Bar */}
+                {cloudUploading && (
+                  <div className="anonymous-cloud-progress-card">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Loader2 size={16} className="spin" color="var(--accent-emerald)" />
+                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff' }}>
+                          Uploading to Cloud (No Login Needed)...
+                        </span>
+                      </div>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem', fontWeight: 800, color: 'var(--accent-emerald)' }}>
+                        {cloudUploadProgress}%
+                      </span>
+                    </div>
+
+                    <div className="google-drive-bar-track">
+                      <div
+                        className="anonymous-cloud-bar-fill"
+                        style={{ width: `${cloudUploadProgress}%` }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      <span>{zipResult.filename}</span>
+                      <span style={{ fontFamily: 'var(--font-mono)', color: '#cbd5e1' }}>
+                        {formatFileSize(cloudUploadBytes.loaded)} / {formatFileSize(cloudUploadBytes.total || zipResult.size)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* 1-Click Cloud Link Ready Card */}
+                {cloudUploadResult && !cloudUploading && (
+                  <div className="anonymous-cloud-success-card">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div className="cloud-success-badge">
+                          <CheckCircle2 size={22} color="var(--accent-emerald)" />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#fff' }}>
+                            Cloud Download Link Ready!
+                          </div>
+                          <div style={{ fontSize: '0.73rem', color: 'var(--text-secondary)' }}>
+                            No login needed • Direct download active for 24 hours
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <button
+                          className="toolbar-btn"
+                          onClick={() => setShowQrCode(!showQrCode)}
+                          title="Scan QR Code with mobile phone"
+                          style={{ padding: '6px 10px', fontSize: '0.74rem' }}
+                        >
+                          <QrCode size={14} />
+                          <span>{showQrCode ? 'Hide QR' : 'Mobile QR'}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Direct Link Input Box */}
+                    <div className="cloud-link-input-group">
+                      <input
+                        type="text"
+                        readOnly
+                        value={cloudUploadResult.downloadUrl}
+                        className="cloud-link-input"
+                        onClick={(e) => (e.target as HTMLInputElement).select()}
+                      />
+
+                      <button
+                        className="cloud-link-copy-btn"
+                        onClick={() => handleCopyCloudLink(cloudUploadResult.downloadUrl)}
+                        title="Copy direct download link"
+                      >
+                        {copiedCloudLink ? <Check size={14} /> : <Copy size={14} />}
+                        <span>{copiedCloudLink ? 'Copied!' : 'Copy Link'}</span>
+                      </button>
+
+                      <a
+                        href={cloudUploadResult.downloadUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="cloud-link-open-btn"
+                        title="Open direct download link in browser"
+                      >
+                        <ExternalLink size={14} />
+                        <span>Open</span>
+                      </a>
+                    </div>
+
+                    {/* Mobile QR Code Box */}
+                    {showQrCode && (
+                      <div className="cloud-qr-box">
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                          <img
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(
+                              cloudUploadResult.downloadUrl
+                            )}`}
+                            alt="Scan to Download on Phone"
+                            style={{
+                              width: '160px',
+                              height: '160px',
+                              borderRadius: '8px',
+                              background: '#fff',
+                              padding: '6px'
+                            }}
+                          />
+                          <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
+                            Point phone camera at QR code to download directly
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Cloud Upload Error Card */}
+                {cloudUploadError && !cloudUploading && (
+                  <div className="google-drive-error-card">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <AlertCircle size={16} color="var(--accent-rose)" />
+                      <span style={{ fontSize: '0.78rem', color: '#fb7185', fontWeight: 600 }}>
+                        {cloudUploadError}
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Google Drive Uploading Live Progress Bar */}
                 {driveUploading && (
