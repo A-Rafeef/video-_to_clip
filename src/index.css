@@ -23,8 +23,8 @@
   --text-secondary: #94a3b8;
   --text-muted: #64748b;
 
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans', 'Noto Sans Malayalam', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace, 'Noto Sans Malayalam';
 
   --radius-sm: 6px;
   --radius-md: 10px;

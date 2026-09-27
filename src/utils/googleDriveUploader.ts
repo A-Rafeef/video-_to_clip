@@ -154,6 +154,7 @@ export async function uploadBlobToGoogleDrive({
     const xhr = new XMLHttpRequest();
     xhr.open('PUT', uploadUrl);
     xhr.setRequestHeader('Content-Type', mimeType);
+    xhr.setRequestHeader('Content-Range', `bytes 0-${blob.size - 1}/${blob.size}`);
 
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable && onProgress) {
